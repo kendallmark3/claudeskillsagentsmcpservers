@@ -66,6 +66,12 @@ ai-shared-services/
 ├── README.md                        ← you are here
 ├── ROADMAP.md                       ← what's next and how to contribute
 ├── CONTRIBUTING.md                  ← how to add skills, agents, and MCPs
+├── intent/
+│   ├── figma-mcp.intent.md          ← intent file for the Figma MCP
+│   ├── linear-mcp.intent.md         ← intent file for the Linear MCP
+│   ├── deployment-skill.intent.md   ← intent file for the Deployment Skill
+│   ├── incident-response-playbook.intent.md
+│   └── dependency-management.intent.md
 ├── docs/
 │   ├── concepts.md                  ← Skills vs Agents vs MCPs vs Intent Files
 │   ├── why.md                       ← the case for this model over random prompting
