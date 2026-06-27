@@ -2,7 +2,7 @@
 
 > A complete operating model for engineering teams adopting AI coding tools — not as autocomplete, but as a structured part of delivery.
 
-[![Lint Markdown](https://github.com/your-org/ai-shared-services/actions/workflows/lint-markdown.yml/badge.svg)](https://github.com/your-org/ai-shared-services/actions/workflows/lint-markdown.yml)
+[![Lint Markdown](https://github.com/kendallmark3/claudeskillsagentsmcpservers/actions/workflows/lint-markdown.yml/badge.svg)](https://github.com/kendallmark3/claudeskillsagentsmcpservers/actions/workflows/lint-markdown.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](#license)
 
 ---
