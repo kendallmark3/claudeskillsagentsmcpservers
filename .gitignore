@@ -7,3 +7,13 @@ __pycache__/
 .DS_Store
 dist/
 build/
+
+# MCP server compiled output
+mcps/github/dist/
+
+# Python virtual environments
+.venv/
+venv/
+
+# Generated scorecard/snapshot outputs (re-run the skill to refresh)
+daily-snapshot.md

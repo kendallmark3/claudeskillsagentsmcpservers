@@ -1,106 +1,132 @@
+#!/usr/bin/env python3
 """
-jira_mcp_server.py
+Jira MCP Server
 
-Starter MCP server exposing controlled, read-only access to Jira.
+Read-only access to Jira stories, comments, links, and status for AI coding agents.
+Agents call these tools instead of having a developer manually copy-paste ticket text.
 
-This is a conceptual starting point, not a production-ready server.
-Wire `jira_client` to your actual Jira client (e.g., the `jira` PyPI package)
-and adapt field mappings to match your Jira instance's configuration
-(custom fields for acceptance criteria will vary by org).
+Usage (stdio — for Claude Code local registration):
+    python server.py
+
+Required environment variables (see mcps/.env.example):
+    JIRA_SERVER      — e.g. https://yourorg.atlassian.net
+    JIRA_API_TOKEN   — Atlassian API token (generate at id.atlassian.com/manage-profile/security/api-tokens)
+    JIRA_EMAIL       — email address associated with the token
 """
 
-from typing import Dict, List
+import json
+import os
+import sys
+
+from jira import JIRA
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP("jira")
 
 
-class JiraMCPServer:
+def _client() -> JIRA:
+    """Build a Jira client from environment variables. Fails fast with a clear error."""
+    required = ["JIRA_SERVER", "JIRA_API_TOKEN", "JIRA_EMAIL"]
+    missing = [v for v in required if not os.environ.get(v)]
+    if missing:
+        sys.exit(
+            f"Missing required environment variables: {', '.join(missing)}\n"
+            f"Copy mcps/.env.example to mcps/.env and fill in your values."
+        )
+    return JIRA(
+        server=os.environ["JIRA_SERVER"],
+        basic_auth=(os.environ["JIRA_EMAIL"], os.environ["JIRA_API_TOKEN"]),
+    )
+
+
+@mcp.tool()
+def get_story(story_id: str) -> str:
     """
-    Exposes a small, deliberate set of read-only tools for retrieving
-    Jira story context. Agents call these methods instead of having a
-    human copy-paste ticket text into a prompt.
+    Fetch a single Jira story with all fields agents commonly need:
+    title, description, status, acceptance criteria, comments, and linked issues.
+
+    Acceptance criteria are extracted from the description under an 'Acceptance Criteria'
+    heading. If your org uses a custom field instead, update _extract_ac() below.
     """
+    client = _client()
+    issue = client.issue(story_id)
+    description = issue.fields.description or ""
 
-    def __init__(self, jira_client):
-        self.jira_client = jira_client
+    result = {
+        "id": story_id,
+        "title": issue.fields.summary,
+        "description": description,
+        "status": issue.fields.status.name,
+        "acceptance_criteria": _extract_ac(description),
+        "comments": [
+            {"author": c.author.displayName, "body": c.body}
+            for c in issue.fields.comment.comments
+        ],
+        "links": [str(link) for link in getattr(issue.fields, "issuelinks", [])],
+    }
+    return json.dumps(result, indent=2)
 
-    def get_story(self, story_id: str) -> Dict:
-        """
-        Fetch a single story with the fields agents most commonly need:
-        title, description, status, acceptance criteria, comments, links.
-        """
-        issue = self.jira_client.issue(story_id)
 
-        return {
-            "id": story_id,
+@mcp.tool()
+def check_status(story_id: str) -> str:
+    """Quick status check for a story — returns just the status string."""
+    client = _client()
+    issue = client.issue(story_id)
+    return issue.fields.status.name
+
+
+@mcp.tool()
+def get_comments(story_id: str) -> str:
+    """Fetch all comments for a story with author names."""
+    client = _client()
+    issue = client.issue(story_id)
+    comments = [
+        {"author": c.author.displayName, "body": c.body}
+        for c in issue.fields.comment.comments
+    ]
+    return json.dumps(comments, indent=2)
+
+
+@mcp.tool()
+def get_links(story_id: str) -> str:
+    """Fetch all linked issues for a story."""
+    client = _client()
+    issue = client.issue(story_id)
+    links = [str(link) for link in getattr(issue.fields, "issuelinks", [])]
+    return json.dumps(links, indent=2)
+
+
+@mcp.tool()
+def find_related_defects(story_id: str) -> str:
+    """
+    Find bugs linked to or referencing this story.
+    Useful for the QA Agent when assessing regression risk.
+
+    Adapt the JQL query to match your org's linking conventions if needed.
+    """
+    client = _client()
+    jql = f'issuelinks = "{story_id}" AND issuetype = Bug'
+    results = client.search_issues(jql)
+    defects = [
+        {
+            "id": issue.key,
             "title": issue.fields.summary,
-            "description": issue.fields.description,
             "status": issue.fields.status.name,
-            "acceptance_criteria": self.extract_acceptance_criteria(issue),
-            "comments": self.get_comments(issue),
-            "links": self.get_links(issue),
         }
-
-    def extract_acceptance_criteria(self, issue) -> str:
-        """
-        Naive extraction assuming acceptance criteria live in the
-        description under a heading. Replace with a custom field
-        lookup if your Jira instance uses one (common pattern:
-        `customfield_XXXXX`).
-        """
-        description = issue.fields.description or ""
-
-        if "Acceptance Criteria" in description:
-            return description.split("Acceptance Criteria", 1)[-1].strip()
-
-        return ""
-
-    def get_comments(self, issue) -> List[Dict]:
-        return [
-            {
-                "author": comment.author.displayName,
-                "body": comment.body,
-            }
-            for comment in issue.fields.comment.comments
-        ]
-
-    def get_links(self, issue) -> List[str]:
-        return [str(link) for link in getattr(issue.fields, "issuelinks", [])]
-
-    def find_related_defects(self, story_id: str) -> List[Dict]:
-        """
-        Searches for defects (bugs) linked to or referencing this story.
-        Useful for the QA Agent when assessing regression risk.
-        """
-        jql = f'issuelinks = "{story_id}" AND issuetype = Bug'
-        results = self.jira_client.search_issues(jql)
-
-        return [
-            {
-                "id": issue.key,
-                "title": issue.fields.summary,
-                "status": issue.fields.status.name,
-            }
-            for issue in results
-        ]
-
-    def check_status(self, story_id: str) -> str:
-        """Quick status check without pulling the full story payload."""
-        issue = self.jira_client.issue(story_id)
-        return issue.fields.status.name
+        for issue in results
+    ]
+    return json.dumps(defects, indent=2)
 
 
-# -----------------------------------------------------------------------
-# Example wiring (adapt to your actual transport — this repo assumes
-# you'll wrap this class with whatever MCP server framework / SDK your
-# AI coding tool expects; the framework wiring is intentionally left
-# out since it varies by tool and version).
-# -----------------------------------------------------------------------
-#
-# from jira import JIRA
-#
-# jira_client = JIRA(
-#     server="https://yourcompany.atlassian.net",
-#     token_auth="<API_TOKEN>",
-# )
-#
-# server = JiraMCPServer(jira_client)
-# story = server.get_story("CUST-4821")
+def _extract_ac(description: str) -> str:
+    """
+    Extract acceptance criteria from the description text.
+    Assumes an 'Acceptance Criteria' heading; adapt if your org uses a custom field.
+    """
+    if "Acceptance Criteria" in description:
+        return description.split("Acceptance Criteria", 1)[-1].strip()
+    return ""
+
+
+if __name__ == "__main__":
+    mcp.run()

@@ -1,0 +1,59 @@
+version: "3.9"
+
+# =============================================================================
+# AI Shared Services — MCP Servers (Docker Compose)
+# =============================================================================
+# Runs all three MCP servers as long-lived HTTP SSE services so multiple
+# developers and repos can connect without each needing a local process.
+#
+# Setup:
+#   1. Copy mcps/.env.example to mcps/.env and fill in your credentials.
+#   2. docker compose up -d
+#   3. Register each server in your Claude Code settings (see mcps/README.md).
+#
+# The servers listen on localhost by default. To expose them across a network
+# or deploy to cloud, put a reverse proxy (nginx, Caddy) in front and add TLS.
+# =============================================================================
+
+services:
+  jira-mcp:
+    build:
+      context: ./jira
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.connect(('localhost', 8000)); s.close()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  confluence-mcp:
+    build:
+      context: ./confluence
+    env_file:
+      - .env
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.connect(('localhost', 8001)); s.close()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  github-mcp:
+    build:
+      context: ./github
+    env_file:
+      - .env
+    ports:
+      - "8002:8002"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('net').connect(8002, 'localhost', function(){ process.exit(0) }).on('error', function(){ process.exit(1) })"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

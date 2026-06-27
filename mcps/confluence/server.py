@@ -1,86 +1,125 @@
+#!/usr/bin/env python3
 """
-confluence_mcp_server.py
+Confluence MCP Server
 
-Starter MCP server exposing controlled, read-only access to Confluence.
+Read-only access to Confluence pages and spaces for AI coding agents.
+Agents pull architecture standards, design decisions, and process docs
+directly instead of relying on stale copy-pasted context.
 
-This is a conceptual starting point, not a production-ready server.
-Wire `confluence_client` to your actual Confluence client (e.g., the
-`atlassian-python-api` package) and adapt to your space/page structure.
+Usage (stdio — for Claude Code local registration):
+    python server.py
+
+Required environment variables (see mcps/.env.example):
+    CONFLUENCE_URL        — e.g. https://yourorg.atlassian.net/wiki
+    CONFLUENCE_USERNAME   — email address of the service account
+    CONFLUENCE_API_TOKEN  — Atlassian API token
 """
 
-from typing import Dict, List
+import json
+import os
+import sys
+
+from atlassian import Confluence
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP("confluence")
 
 
-class ConfluenceMCPServer:
-    """
-    Exposes a small set of read-only tools for retrieving architecture
-    notes, standards, and design decisions stored in Confluence — so
-    agents can pull current standards instead of working from stale
-    or copy-pasted context.
-    """
-
-    def __init__(self, confluence_client):
-        self.confluence_client = confluence_client
-
-    def get_page(self, page_id: str) -> Dict:
-        """Fetch a single page's content and metadata."""
-        page = self.confluence_client.get_page_by_id(
-            page_id, expand="body.storage,version"
+def _client() -> Confluence:
+    """Build a Confluence client from environment variables. Fails fast with a clear error."""
+    required = ["CONFLUENCE_URL", "CONFLUENCE_USERNAME", "CONFLUENCE_API_TOKEN"]
+    missing = [v for v in required if not os.environ.get(v)]
+    if missing:
+        sys.exit(
+            f"Missing required environment variables: {', '.join(missing)}\n"
+            f"Copy mcps/.env.example to mcps/.env and fill in your values."
         )
+    return Confluence(
+        url=os.environ["CONFLUENCE_URL"],
+        username=os.environ["CONFLUENCE_USERNAME"],
+        password=os.environ["CONFLUENCE_API_TOKEN"],
+        cloud=True,
+    )
 
-        return {
-            "id": page_id,
-            "title": page["title"],
-            "content": page["body"]["storage"]["value"],
-            "last_updated": page["version"]["when"],
-            "last_updated_by": page["version"]["by"]["displayName"],
+
+@mcp.tool()
+def get_page(page_id: str) -> str:
+    """
+    Fetch a Confluence page by ID — returns title, full content, last updated date,
+    and the name of who last updated it.
+
+    To find a page ID: open the page in your browser, click the three-dot menu,
+    and choose 'Page information'. The ID is in the URL.
+    """
+    client = _client()
+    page = client.get_page_by_id(page_id, expand="body.storage,version")
+    result = {
+        "id": page_id,
+        "title": page["title"],
+        "content": page["body"]["storage"]["value"],
+        "last_updated": page["version"]["when"],
+        "last_updated_by": page["version"]["by"]["displayName"],
+    }
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def search_pages(space_key: str, query: str, limit: int = 5) -> str:
+    """
+    Search for pages in a Confluence space matching a text query.
+    Returns page ID, title, and URL for each match.
+
+    Useful when an agent needs 'the architecture standard for X' but doesn't
+    know the page ID ahead of time.
+    """
+    client = _client()
+    cql = f'space = "{space_key}" AND text ~ "{query}" ORDER BY lastModified DESC'
+    results = client.cql(cql, limit=limit)
+    pages = [
+        {
+            "id": r["content"]["id"],
+            "title": r["content"]["title"],
+            "url": r["content"].get("_links", {}).get("webui", ""),
         }
-
-    def search_pages(self, space_key: str, query: str, limit: int = 5) -> List[Dict]:
-        """
-        Search for pages within a space matching a query — useful when
-        an agent needs to find "the architecture standard for X" without
-        already knowing the page ID.
-        """
-        cql = f'space = "{space_key}" AND text ~ "{query}"'
-        results = self.confluence_client.cql(cql, limit=limit)
-
-        return [
-            {
-                "id": result["content"]["id"],
-                "title": result["content"]["title"],
-                "url": result["content"].get("_links", {}).get("webui", ""),
-            }
-            for result in results.get("results", [])
-        ]
-
-    def get_architecture_standards(self, space_key: str) -> List[Dict]:
-        """
-        Convenience method that searches a known space for pages tagged
-        or titled as architecture standards. Adapt the query to match
-        your team's actual labeling/tagging convention.
-        """
-        return self.search_pages(space_key, "architecture standard")
-
-    def get_page_history(self, page_id: str, limit: int = 5) -> List[Dict]:
-        """Fetch recent version history for a page — useful for checking staleness."""
-        history = self.confluence_client.history(page_id)
-        versions = history.get("history", {}).get("contributors", {})
-        return versions if versions else []
+        for r in results.get("results", [])
+    ]
+    return json.dumps(pages, indent=2)
 
 
-# -----------------------------------------------------------------------
-# Example wiring (adapt to your actual transport — wrap this class with
-# whatever MCP server framework your AI coding tool expects).
-# -----------------------------------------------------------------------
-#
-# from atlassian import Confluence
-#
-# confluence_client = Confluence(
-#     url="https://yourcompany.atlassian.net/wiki",
-#     username="<EMAIL>",
-#     password="<API_TOKEN>",
-# )
-#
-# server = ConfluenceMCPServer(confluence_client)
-# page = server.get_page("123456")
+@mcp.tool()
+def get_architecture_standards(space_key: str) -> str:
+    """
+    Convenience tool — searches a space for pages that match 'architecture standard'.
+    Adapt the search term to match your team's labeling convention.
+    """
+    client = _client()
+    cql = f'space = "{space_key}" AND text ~ "architecture standard" ORDER BY lastModified DESC'
+    results = client.cql(cql, limit=10)
+    pages = [
+        {
+            "id": r["content"]["id"],
+            "title": r["content"]["title"],
+            "url": r["content"].get("_links", {}).get("webui", ""),
+        }
+        for r in results.get("results", [])
+    ]
+    return json.dumps(pages, indent=2)
+
+
+@mcp.tool()
+def list_space_pages(space_key: str, limit: int = 20) -> str:
+    """
+    List the most recently updated pages in a Confluence space.
+    Useful for orienting an agent to what's available before searching.
+    """
+    client = _client()
+    pages = client.get_all_pages_from_space(space_key, limit=limit)
+    result = [
+        {"id": p["id"], "title": p["title"]}
+        for p in pages
+    ]
+    return json.dumps(result, indent=2)
+
+
+if __name__ == "__main__":
+    mcp.run()

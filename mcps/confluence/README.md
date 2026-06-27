@@ -1,44 +1,77 @@
 # Confluence MCP
 
-Read-only connector giving agents access to architecture notes, standards, and design decisions stored in Confluence.
+Read-only connector giving agents controlled access to Confluence pages and spaces — so agents can pull current architecture standards instead of working from stale or copy-pasted context.
 
 ## Tools Exposed
 
 | Tool | Description |
 |---|---|
-| `get_page(page_id)` | Fetch a page's content and last-updated metadata |
-| `search_pages(space_key, query, limit)` | Search a space for pages matching a query |
-| `get_architecture_standards(space_key)` | Convenience search for architecture standard pages |
-| `get_page_history(page_id, limit)` | Recent version/contributor history — useful for checking if a standard is stale |
+| `get_page(page_id)` | Returns page title, full content, last updated date, and author |
+| `search_pages(space_key, query, limit)` | Text search within a space — returns page IDs, titles, and URLs |
+| `get_architecture_standards(space_key)` | Convenience search for pages matching "architecture standard" |
+| `list_space_pages(space_key, limit)` | Lists most recently updated pages in a space |
 
-This is most useful for the **Architect Agent** and **Backend/API Agent**, which need current architecture standards rather than whatever a developer remembers or has bookmarked.
+Most useful for the **Architect Agent** and **Backend/API Agent**, which need current architecture standards rather than whatever a developer remembers or has bookmarked.
 
 ## Setup
 
-1. Install the client library: `pip install atlassian-python-api`
-2. Generate an API token in your Atlassian account (can reuse the same token as the Jira MCP if scoped appropriately).
-3. Set credentials via environment variables:
-   ```bash
-   export CONFLUENCE_URL="https://yourcompany.atlassian.net/wiki"
-   export CONFLUENCE_EMAIL="..."
-   export CONFLUENCE_API_TOKEN="..."
-   ```
-4. Wrap `ConfluenceMCPServer` with your AI coding tool's MCP server framework.
+### Dependencies
 
-## Adapting Search
+```bash
+pip install -r requirements.txt
+```
 
-`get_architecture_standards` assumes pages are findable by searching for the literal phrase "architecture standard." Most teams will get better results by:
-- Using a consistent Confluence label (e.g., `architecture-standard`) and querying by label instead of free text
-- Maintaining a dedicated space for standards so `space_key` alone narrows results meaningfully
+### Credentials
 
-Update the CQL query in `search_pages` / `get_architecture_standards` to match whichever convention your team actually uses.
+```bash
+cp ../.env.example ../.env
+# Fill in CONFLUENCE_URL, CONFLUENCE_USERNAME, CONFLUENCE_API_TOKEN
+```
+
+Generate an API token at: **id.atlassian.com → Security → API tokens**
+
+The same Atlassian API token works for both Jira and Confluence.
+
+### Register with Claude Code
+
+```json
+{
+  "mcpServers": {
+    "confluence": {
+      "command": "python",
+      "args": ["path/to/ai-shared-services/mcps/confluence/server.py"],
+      "env": {
+        "CONFLUENCE_URL": "https://yourorg.atlassian.net/wiki",
+        "CONFLUENCE_USERNAME": "you@yourorg.com",
+        "CONFLUENCE_API_TOKEN": "your-token"
+      }
+    }
+  }
+}
+```
+
+## Finding Page IDs
+
+Open the page in your browser → click the `...` menu → **Page information**. The ID appears in the URL as `/pages/[ID]/`.
+
+Use `search_pages` or `list_space_pages` to discover IDs programmatically when you don't have them ahead of time.
+
+## Adapting the Architecture Standards Search
+
+`get_architecture_standards` searches for pages matching "architecture standard". If your team uses labels or different naming, update the CQL query in `server.py`:
+
+```python
+cql = f'space = "{space_key}" AND label = "architecture" ORDER BY lastModified DESC'
+```
 
 ## Scope and Permissions
 
-- Read-only by design. Do not add page-editing capability without a clear approval/audit story — letting an agent silently update architecture docs is a much bigger decision than letting it read them.
-- Scope the service account to the specific spaces this team needs, not the whole Confluence instance.
+- **Read-only.** No page creation, editing, or comment posting.
+- Use a service account with read access to the specific spaces this team needs — not org-wide access.
+- `cloud=True` is set in the client. Change to `cloud=False` for Confluence Data Center / Server deployments.
 
 ## Known Limitations
 
-- No caching — pages are fetched live on every call. Add caching if architecture docs are large or called frequently within a single agent run.
-- `get_page_history` returns raw contributor data; you may want to post-process this into a cleaner "last reviewed" signal for staleness checks.
+- `get_page` returns raw Confluence storage format (XML-like). Agents handle this well but it may look unusual if printed directly.
+- No pagination beyond the `limit` parameter — increase the limit or use `search_pages` for large spaces.
+- No caching — pages are fetched live. Add caching if architecture docs are large or called frequently within a single session.

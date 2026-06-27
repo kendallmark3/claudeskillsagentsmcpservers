@@ -6,35 +6,67 @@ Read-only connector giving agents controlled access to Jira stories, comments, l
 
 | Tool | Description |
 |---|---|
-| `get_story(story_id)` | Returns title, description, status, acceptance criteria, comments, and links for a story |
-| `extract_acceptance_criteria(issue)` | Pulls acceptance criteria out of the description (adapt if your org uses a custom field instead) |
-| `get_comments(issue)` | Returns all comments with author |
-| `get_links(issue)` | Returns linked issues |
+| `get_story(story_id)` | Returns title, description, status, acceptance criteria, comments, and links |
+| `check_status(story_id)` | Quick status lookup without pulling the full story payload |
+| `get_comments(story_id)` | Returns all comments with author names |
+| `get_links(story_id)` | Returns linked issues |
 | `find_related_defects(story_id)` | Finds bugs linked to or referencing the story — useful for QA Agent regression assessment |
-| `check_status(story_id)` | Quick status lookup |
 
 ## Setup
 
-1. Install the Jira client library: `pip install jira`
-2. Generate an API token in your Atlassian account.
-3. Wire credentials via environment variables, not hardcoded values:
-   ```bash
-   export JIRA_SERVER="https://yourcompany.atlassian.net"
-   export JIRA_API_TOKEN="..."
-   export JIRA_EMAIL="..."
-   ```
-4. Wrap `JiraMCPServer` with your AI coding tool's MCP server framework. The exact wiring depends on which tool/SDK version you're using — see your tool's MCP documentation for the server registration pattern.
+### Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### Credentials
+
+```bash
+cp ../. env.example ../.env
+# Fill in JIRA_SERVER, JIRA_API_TOKEN, JIRA_EMAIL
+```
+
+Generate an API token at: **id.atlassian.com → Security → API tokens**
+
+### Register with Claude Code
+
+Add to `.claude/settings.json` in any repo that should have Jira access:
+
+```json
+{
+  "mcpServers": {
+    "jira": {
+      "command": "python",
+      "args": ["path/to/ai-shared-services/mcps/jira/server.py"],
+      "env": {
+        "JIRA_SERVER": "https://yourorg.atlassian.net",
+        "JIRA_API_TOKEN": "your-token",
+        "JIRA_EMAIL": "you@yourorg.com"
+      }
+    }
+  }
+}
+```
 
 ## Acceptance Criteria Field Mapping
 
-`extract_acceptance_criteria` assumes acceptance criteria live in the description under a literal "Acceptance Criteria" heading. Many Jira instances instead use a custom field (e.g., `customfield_10042`). Check your instance's field configuration and update the extraction logic accordingly — this is the most common adaptation needed before this MCP is useful in your org.
+`get_story` extracts acceptance criteria from the description text under a literal "Acceptance Criteria" heading. Many Jira instances use a custom field instead (e.g., `customfield_10042`). To use a custom field, update `_extract_ac()` in `server.py`:
+
+```python
+def _extract_ac(description: str) -> str:
+    # Replace with: return issue.fields.customfield_10042 or ""
+    ...
+```
 
 ## Scope and Permissions
 
-- This connector is **read-only by design**. Do not add write operations (status transitions, comment posting) until the team has reviewed the audit/approval implications.
-- Use a service account with the minimum project access needed, not a personal account with org-wide access.
+- **Read-only by design.** Do not add write operations (status transitions, comment posting) without reviewing the audit/approval implications.
+- Use a service account with minimum project access — not a personal account with org-wide access.
+- Token scope: `read:jira-work` (Jira Cloud) is sufficient.
 
 ## Known Limitations
 
-- `find_related_defects` uses a simple JQL pattern; tune it to your org's linking conventions (some teams use "relates to," others use custom link types).
-- No caching — repeated calls hit the Jira API directly. Add caching if your team's MCP call volume is high.
+- `find_related_defects` uses a simple JQL pattern. Tune to your org's linking conventions (some teams use "relates to," others use custom link types).
+- No caching — repeated calls hit the Jira API directly. Add caching if call volume is high.
+- Acceptance criteria extraction assumes a heading-based format; custom fields require a code change (see above).

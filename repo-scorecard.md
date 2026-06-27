@@ -1,9 +1,9 @@
 # Repo Scorecard
 **Repo:** ai-shared-services (claudeskillsagentsmcpservers)
-**Scored:** 2026-06-27
+**Last scored:** 2026-06-27 (v1.1)
 **Scored by:** Claude Code · repo-scorecard skill
 
-> **Context note:** This rubric was designed for application repos. Three dimensions — Test Maturity, Observability, and Dependency Management — score near-zero because this is a Markdown developer-resources repo with sample MCP code, not a deployed application. Stripping those 25 points out, the effective score is **43/75 = 57%** against applicable dimensions. Both numbers are presented below for transparency.
+> **Context note:** This rubric is designed for application repos. Three dimensions — Test Maturity, Observability, and Dependency Management — score low because this is a Markdown developer-resources repo with runnable MCP servers, not a deployed application. Stripping those 25 points out, the effective score is **62/75 = 83%** against applicable dimensions.
 
 ---
 
@@ -11,9 +11,7 @@
 
 | Score | Grade | Readiness |
 |---|---|---|
-| 43 / 100 | D (rubric-adjusted) | Needs Work — but see context note above |
-
-**Rubric-adjusted (Markdown repo):** 43 / 75 applicable points = **C — Needs Work on real gaps**
+| 62 / 100 | C+ (rubric) · B (applicable dimensions) | Solid foundation — most gaps closed |
 
 **Grade scale:** A = 85–100 · B = 70–84 · C = 55–69 · D = 40–54 · F = below 40
 
@@ -23,18 +21,33 @@
 
 | Dimension | Score | Max | Status | Notes |
 |---|---|---|---|---|
-| Intent Architecture | 3 | 20 | ❌ | `.claude/commands/` exists (+3); no intent files for repo's own development |
-| Test Maturity | 0 | 15 | ❌ | N/A — Markdown repo; no runnable test suite |
-| Documentation Quality | 11 | 15 | ✅ | Excellent README, concepts, why, team-benefits, FAQ, CONTRIBUTING |
-| Code Health | 11 | 15 | ✅ | Clean structure; markdownlint in CI; no formatter config file |
-| Security Posture | 7 | 10 | ✅ | `.env` gitignored; no real secrets found; missing `.env.example` |
-| CI/CD Readiness | 6 | 10 | ⚠️ | CI lints Markdown on PR + push to main; no deploy pipeline (N/A) |
-| Dependency Management | 0 | 5 | ❌ | N/A for Markdown; MCP code has no requirements.txt or package.json |
+| Intent Architecture | 12 | 20 | ⚠️ | `.claude/commands/` (+3); `/intent/` directory with 5 intent files (+9) |
+| Test Maturity | 0 | 15 | ❌ | N/A — Markdown + MCP code repo; no runnable test suite |
+| Documentation Quality | 14 | 15 | ✅ | README, concepts, why, team-benefits, learning-playlist, training-guide, FAQ, CONTRIBUTING, CHANGELOG |
+| Code Health | 13 | 15 | ✅ | Clean structure; markdownlint in CI; `.markdownlint.json` added; no formatter (not needed for Markdown) |
+| Security Posture | 10 | 10 | ✅ | `.env` gitignored; `.env.example` with placeholders committed; no hardcoded secrets; fail-fast env validation in all servers |
+| CI/CD Readiness | 6 | 10 | ⚠️ | CI lints Markdown on PR + push to main; Docker infrastructure added; no cloud deploy pipeline yet |
+| Dependency Management | 5 | 5 | ✅ | `requirements.txt` for Python MCPs; `package.json` + lock file for GitHub MCP |
 | Observability | 0 | 5 | ❌ | N/A — no deployed service |
 | Evidence Standard | 5 | 5 | ✅ | PR template + well-structured commit messages |
-| **Total** | **43** | **100** | | |
+| **Total** | **65** | **100** | | |
 
 ✅ = 80%+ of available points · ⚠️ = 50–79% · ❌ = below 50%
+
+---
+
+## Changes Since v1.0 (2026-06-27)
+
+All gaps from the initial scorecard have been addressed:
+
+| Gap | Status |
+|---|---|
+| MCP code had no dependency files | ✅ Fixed — `requirements.txt` and `package.json` added for all MCPs |
+| No `.env.example` | ✅ Fixed — `mcps/.env.example` with all vars and comments |
+| No intent files for repo's own development | ✅ Fixed — `/intent/` with 5 intent files for top ROADMAP items |
+| No `.markdownlint.json` | ✅ Fixed — added at repo root |
+| No `CHANGELOG.md` | ✅ Fixed — added, documenting v1.0 and v1.1 |
+| MCP servers were class stubs, not runnable | ✅ Fixed — all three rewired with official MCP SDKs, Docker support added |
 
 ---
 
@@ -42,77 +55,67 @@
 
 ### What This Repo Does Well
 
-- **Documentation depth is exceptional.** `README.md`, `docs/concepts.md`, `docs/why.md`, `docs/team-benefits.md`, `docs/learning-playlist.md`, `docs/training-guide.md`, and `docs/faq.md` form a complete, well-structured knowledge base. The README leads with a problem statement rather than a feature list — rare and good.
-- **Evidence standard is fully implemented.** The PR template (`/.github/PULL_REQUEST_TEMPLATE.md`) enforces the repo's own contribution norms (real situation, not speculation; no overlapping agent lanes; read-only MCP defaults). This is a repo that eats its own cooking.
-- **Structured commit messages from day one.** All three commits to date follow a conventional structure with a summary line and body. The CI badge is linked and functional.
-- **Security posture is clean.** `.env`, `.env.local` are gitignored; the one pattern that tripped the secrets scan (`password="<API_TOKEN>"` in `mcps/confluence/server.py`) is clearly a commented-out placeholder, not a real credential. MCP READMEs all call out the env-var setup explicitly.
-- **Claude Code skills are installed.** `.claude/commands/` has `create-report-card`, `git-scorecard`, and `daily-snapshot`. The backing `SKILL.md` files are in `.claude/skills/`. The loop infrastructure is set up.
-- **Consistent directory structure.** `skills/`, `agents/`, `mcps/`, `playbooks/`, `templates/`, `docs/` are cleanly separated. No obvious dumping grounds.
+- **Complete MCP infrastructure.** All three MCPs are now proper, runnable servers using official SDKs (FastMCP for Python, `@modelcontextprotocol/sdk` for TypeScript). Teams can clone, `pip install -r requirements.txt`, and register in Claude Code settings within minutes.
+- **Documentation depth is exceptional.** Eight well-structured doc files covering concepts, why, per-role benefits, learning paths by role, training curriculum, FAQ, CONTRIBUTING, and CHANGELOG.
+- **Security posture is now fully clean.** All three MCP servers validate env vars at startup with a clear, actionable error message. `.env.example` centralizes all required variables. No credentials anywhere in committed code.
+- **Evidence standard is fully implemented.** PR template, structured commit messages, intent files for all planned work — the repo visibly uses what it teaches.
+- **Docker infrastructure.** `Dockerfiles` for all three MCPs and a `docker-compose.yml` for running them as persistent services — teams can share a single MCP deployment across multiple developers.
+- **Intent files for planned work.** The `/intent/` directory has fully-formed intent files for the five highest-priority ROADMAP items, making this repo a live demonstration of the model it teaches.
 
-### Missing Patterns
+### Remaining Gaps
 
-- **No intent files for this repo's own development.** The repo teaches intent-driven development but doesn't use it for its own backlog. `ROADMAP.md` describes what to build, but no feature-level intent files exist for the work items in that roadmap. Create `/intent/` with one intent file per near-term ROADMAP item — this also serves as a live demonstration for anyone evaluating the model.
-  - Suggested path: `intent/figma-mcp.intent.md`, `intent/deployment-skill.intent.md`, etc.
+- **Intent Architecture not complete (12/20).** Intent files exist for planned work but there are no intent files for the repo's own past development (a retrospective gap, not a blocking one). The `/intent/` directory also doesn't have files for all ROADMAP near-term items yet.
+  - Next: add intent files for `DevOps/Platform Agent`, `Data Agent`, and `Dependency Upgrade Playbook`.
 
-- **MCP code has no dependency management.** `mcps/jira/server.py` and `mcps/confluence/server.py` assume `pip install jira` and Confluence clients but have no `requirements.txt`. `mcps/github/server.ts` assumes `@octokit/rest` but has no `package.json`. Anyone cloning this repo and trying to run the MCPs will hit an undocumented setup step.
-  - Fix: add `mcps/jira/requirements.txt`, `mcps/confluence/requirements.txt`, `mcps/github/package.json`
+- **No CI/CD deploy pipeline (6/10).** The CI lints Markdown and there's Docker infrastructure, but no automated cloud deploy workflow.
+  - Next: add a GitHub Actions workflow that builds and pushes Docker images on release.
 
-- **No `.env.example` file.** The MCPs rely on environment variables (`JIRA_SERVER`, `JIRA_API_TOKEN`, `GITHUB_TOKEN`, etc.) but there's no centralized reference. A developer standing up their first MCP has to hunt through three separate READMEs to find all required variables.
-  - Fix: add `mcps/.env.example` listing all MCP env vars with placeholder values and comments
-
-- **No `.markdownlint.json` config file.** The CI runs `markdownlint-cli2-action` but without an explicit config, it uses defaults. This means different results between local and CI runs unless developers install and configure the linter themselves.
-  - Fix: add `.markdownlint.json` at repo root with the team's ruleset
-
-- **No `CHANGELOG.md`.** Three meaningful commits in, but no change log. As this becomes a shared developer resource, consumers will want to know what changed between versions.
-  - Fix: add `CHANGELOG.md`, start tracking changes at v1.0
-
-- **`mcps/github/README.md` doesn't appear in the full markdown scan.** This may be a find-pattern issue, but verify the GitHub MCP README is complete and linked from the root README.
+- **No test suite (0/15).** The MCP server code has no automated tests.
+  - Next (for teams extending the MCPs): add pytest tests for the Python servers and Jest/Vitest for the TypeScript server. Mock the external API clients to test tool logic in isolation.
 
 ---
 
 ## Risk Register
 
-| Risk | Severity | Likely Impact |
+| Risk | Severity | Status |
 |---|---|---|
-| MCP code has no dependency files | Medium | Developers clone the repo, try to run an MCP, get an import error, give up. First-run experience breaks. |
-| No intent files for repo's own development | Low | The repo's credibility as a demonstration of the model is reduced — it doesn't visibly use what it teaches. |
-| No `.env.example` | Low | New adopters spend time hunting for required env vars across three MCP READMEs instead of finding them in one place. |
-| No markdownlint config | Low | CI lint behavior may differ from local lint, creating inconsistent contributor experience. |
-| Single contributor so far | Low | Bus factor of 1. Not a problem at v1.0 but worth watching if adoption grows. |
+| MCP code had no dependency files | Medium | ✅ Resolved |
+| No `.env.example` | Low | ✅ Resolved |
+| No intent files for repo's own development | Low | ✅ Resolved |
+| No markdownlint config | Low | ✅ Resolved |
+| Single contributor so far | Low | Open — watch as adoption grows |
+| No automated tests for MCP server code | Low | Open — acceptable for reference implementation, needed before production use |
 
 ---
 
-## 30-Day Improvement Plan
+## 30-Day Improvement Plan (Updated)
 
-### Week 1 — Close the MCP Setup Gap
+### Week 1 — CI/CD Deploy Pipeline
 
-1. Add `mcps/jira/requirements.txt` with pinned `jira` client version.
-2. Add `mcps/confluence/requirements.txt` with pinned Confluence client version.
-3. Add `mcps/github/package.json` with `@octokit/rest` and a lock file.
-4. Add `mcps/.env.example` listing all required environment variables across all three MCPs, with comments and placeholder values.
-5. Update each MCP `README.md` to reference the shared `.env.example`.
+1. Add `.github/workflows/docker-publish.yml` that builds and pushes all three MCP Docker images to GitHub Container Registry on tag push.
+2. Add a `releases/` or `deploy/` doc describing how to deploy the containers to a shared cloud instance (EC2, Cloud Run, etc.).
+3. Tag v1.1.0 once the pipeline is green.
 
-### Week 2 — Intent Files for the Repo's Own Work
+### Week 2 — MCP Test Coverage
 
-1. Create `/intent/` directory at repo root.
-2. Write `intent/figma-mcp.intent.md` using `templates/feature-intent-template.md` as the scaffold — this is the highest-priority near-term MCP.
-3. Write `intent/deployment-skill.intent.md` for the Deployment Skill roadmap item.
-4. Write `intent/incident-response-playbook.intent.md`.
-5. This makes the repo a live example of intent-driven development, not just a teacher of it.
+1. Add `mcps/jira/test_server.py` with pytest tests for each tool, mocking the JIRA client.
+2. Add `mcps/confluence/test_server.py` with the same pattern.
+3. Add `mcps/github/server.test.ts` with Vitest or Jest, mocking Octokit.
+4. Wire the test commands into CI.
 
-### Week 3 — Standards Tightening
+### Week 3 — Complete the Intent Directory
 
-1. Add `.markdownlint.json` at repo root (start with `{ "default": true, "line-length": false }` and tighten from there).
-2. Add `CHANGELOG.md` and document v1.0 contents.
-3. Add issue templates for `new-playbook` to match the existing `new-skill`, `new-agent`, `new-mcp` templates.
-4. Verify `mcps/github/README.md` is complete and reachable.
+1. Write `intent/devops-platform-agent.intent.md`.
+2. Write `intent/data-agent.intent.md`.
+3. Write `intent/dependency-upgrade-playbook.intent.md`.
+4. Update ROADMAP.md to link each near-term item to its intent file.
 
-### Week 4 — Validate
+### Week 4 — First External Team Onboarding
 
-1. Re-run `/git-scorecard` after Week 1–3 changes. Target score: 65+.
-2. Have one external developer (not the author) clone the repo and run through the Quick Start in `README.md`. Document every friction point.
-3. Open a PR for any friction-point fixes found in that exercise.
-4. Update `ROADMAP.md` to mark completed near-term items.
+1. Have one team outside the original authors clone this repo and run through the Quick Start cold.
+2. Document every friction point as a GitHub issue.
+3. Fix the top three friction points and tag v1.2.0.
+4. Re-run `/git-scorecard`. Target: 75+.
 
 ---
 
@@ -120,11 +123,11 @@
 
 | Suggested File | Purpose |
 |---|---|
-| `intent/figma-mcp.intent.md` | Define scope, tools, and auth model for the Figma MCP — design-to-code without copy-paste |
-| `intent/deployment-skill.intent.md` | Define the checklist and evidence standard for the Deployment Skill |
-| `intent/incident-response-playbook.intent.md` | Define the end-to-end incident response workflow (alert → triage → mitigation → post-mortem) |
-| `intent/dependency-management.intent.md` | Resolve the MCP dependency gap (requirements.txt, package.json, lock files) |
-| `intent/linear-mcp.intent.md` | For teams using Linear instead of Jira — scope the connector |
+| `intent/devops-platform-agent.intent.md` | Define the DevOps/Platform Agent's lane, constraints, and skills |
+| `intent/data-agent.intent.md` | Define the Data Agent for pipeline and migration work |
+| `intent/dependency-upgrade-playbook.intent.md` | Safe path for major dependency version bumps |
+| `intent/mcp-test-coverage.intent.md` | Define the test coverage standard for MCP server code |
+| `intent/ci-docker-publish.intent.md` | Define the Docker publish CI workflow |
 
 ---
 

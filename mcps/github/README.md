@@ -1,38 +1,71 @@
 # GitHub MCP
 
-Connector giving agents controlled access to pull requests, file contents, commits, comments, and CI/workflow status.
+Read-only connector giving agents controlled access to pull requests, file contents, commits, comments, and CI/workflow status.
+
+Primary MCP for the **PR Review Agent** — lets that agent inspect a real PR (changed files, CI status, comments) instead of relying on a pasted summary.
 
 ## Tools Exposed
 
 | Tool | Description |
 |---|---|
-| `getPullRequest(owner, repo, prNumber)` | Returns PR metadata, author, and changed files |
-| `getChangedFiles(owner, repo, prNumber)` | List of changed file paths only |
-| `getFileContent(owner, repo, path, ref)` | Raw content of a file at a given ref |
-| `getRecentCommits(owner, repo, branch, limit)` | Recent commit history on a branch |
-| `getPrComments(owner, repo, prNumber)` | Review/discussion comments on a PR |
-| `getWorkflowStatus(owner, repo, ref)` | CI/CD workflow run status for a commit |
-
-This is the primary MCP used by the **PR Review Agent** — it lets that agent inspect a real PR (changed files, CI status, comments) instead of relying on a pasted summary.
+| `get_pull_request(owner, repo, prNumber)` | Returns PR metadata, author, changed files with add/delete counts |
+| `get_changed_files(owner, repo, prNumber)` | Returns just the list of changed file paths — lighter than get_pull_request |
+| `get_file_content(owner, repo, path, ref)` | Raw content of a file at a given branch, tag, or commit SHA |
+| `get_recent_commits(owner, repo, branch, limit)` | Recent commit history on a branch |
+| `get_pr_comments(owner, repo, prNumber)` | Review and discussion comments on a PR |
+| `get_workflow_status(owner, repo, ref)` | GitHub Actions CI/CD status for a commit SHA |
 
 ## Setup
 
-1. Install the GitHub client library: `npm install @octokit/rest`
-2. Generate a fine-grained personal access token or, preferably, a GitHub App installation token scoped to the specific repos this team needs.
-3. Set the token via environment variable, not hardcoded:
-   ```bash
-   export GITHUB_TOKEN="..."
-   ```
-4. Wrap `GitHubMCPServer` with your AI coding tool's MCP server framework.
+### Dependencies
+
+```bash
+cd mcps/github
+npm install
+npm run build   # compiles server.ts → dist/server.js
+```
+
+### Credentials
+
+```bash
+cp ../.env.example ../.env
+# Fill in GITHUB_TOKEN
+```
+
+Generate a fine-grained personal access token at: **github.com → Settings → Developer settings → Personal access tokens → Fine-grained tokens**
+
+Minimum required permissions (read-only):
+- **Contents** — read
+- **Pull requests** — read
+- **Actions** — read (for CI status)
+
+Scope the token to only the repos this team works in — not your whole org.
+
+### Register with Claude Code
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "node",
+      "args": ["path/to/ai-shared-services/mcps/github/dist/server.js"],
+      "env": {
+        "GITHUB_TOKEN": "your-github-token"
+      }
+    }
+  }
+}
+```
 
 ## Scope and Permissions
 
-- Prefer **read-only** scopes (`repo:status`, `public_repo` or read-only fine-grained permissions) for the first version of this connector.
-- If you later need write access (e.g., posting a PR Review Agent's comments directly), scope that token separately and document the write path explicitly — don't silently upgrade the read-only token's permissions.
-- Limit the token to the specific repos this shared services team works in, not your whole GitHub org.
+- **Read-only by default.** Do not add write operations (posting comments, creating PRs) without scoping a separate token and documenting the write path explicitly — don't silently upgrade the read-only token's permissions.
+- Prefer fine-grained personal access tokens over classic tokens: they can be scoped to specific repos and expire.
+- Consider a GitHub App installation token instead of a PAT for team/org deployments — App tokens expire automatically and don't depend on an individual's account.
 
 ## Known Limitations
 
-- `getWorkflowStatus` assumes GitHub Actions; adapt if your team uses a different CI provider (Jenkins, CircleCI, etc. — would need a separate MCP or extended tool).
-- No pagination handling shown for very large PRs (100+ changed files) or long commit histories — add pagination if your repos are large.
-- No rate-limit backoff included — add retry/backoff logic before using this against high-traffic repos.
+- `get_workflow_status` assumes GitHub Actions. For Jenkins, CircleCI, or other CI providers, a separate MCP or extended tool is needed.
+- No pagination for very large PRs (100+ changed files) or long commit histories — add pagination if your repos are large.
+- No rate-limit backoff — add retry logic before using against high-traffic repos or in CI.
+- The TypeScript source must be compiled before running (`npm run build`). The `dist/` folder is gitignored; run the build after cloning.
